@@ -1,0 +1,55 @@
+services:
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.9.2
+    container_name: mlflow_server
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow_data:/mlflow
+    environment:
+      - MLFLOW_BACKEND_STORE_URI=sqlite:///mlflow/mlflow.db
+      - MLFLOW_ARTIFACT_ROOT=/mlflow/artifacts
+      - MLFLOW_ARTIFACTS_DESTINATION=/mlflow/artifacts
+    command: >
+      mlflow server
+      --backend-store-uri sqlite:///mlflow/mlflow.db
+      --default-artifact-root /mlflow/artifacts
+      --artifacts-destination /mlflow/artifacts
+      --host 0.0.0.0
+      --port 5000
+    restart: unless-stopped
+    networks:
+      - mlflow_network
+      - database_trading_network
+
+  trainer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rsi_trainer
+    volumes:
+      - mlflow_data:/mlflow
+    environment:
+      - POSTGRES_HOST=trading_postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=trading_db
+      - POSTGRES_USER=trading_user
+      - POSTGRES_PASSWORD=trading_password_123
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+    depends_on:
+      - mlflow
+    networks:
+      - mlflow_network
+      - database_trading_network
+    profiles:
+      - training
+
+volumes:
+  mlflow_data:
+
+networks:
+  mlflow_network:
+    driver: bridge
+  database_trading_network:
+    external: true
+    name: database_trading_network
